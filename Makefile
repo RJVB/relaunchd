@@ -39,9 +39,11 @@ launchd-debug:
 
 config.h: Makefile Makefile.inc
 	echo "/* Automatically generated -- do not edit */" > config.h
-	printf '#define HAVE_SYS_LIMITS_H ' >> config.h
-	echo '#include <sys/limits.h>' | $(CC) $(CFLAGS) -x c -c - 2>/dev/null; \
-		echo "$$? == 0" | bc >> config.h
+.if exists(/usr/include/sys/limits.h)
+		printf '#define HAVE_SYS_LIMITS_H 1' >> config.h
+.else
+		printf '#define HAVE_SYS_LIMITS_H 0' >> config.h
+.endif
  
 clean:
 	rm -f *.o config.h
@@ -62,7 +64,7 @@ install-extra:
 install:
 	install -s -m 755 launchd $$DESTDIR$(SBINDIR)
 	install -m 755 launchctl $$DESTDIR$(BINDIR)
-	install -d -m 700 $$DESTDIR/var/db/launchd
+	install -d -m 700 $$DESTDIR$(PREFIX)/var/db/launchd
 	install -d -m 755 $$DESTDIR$(SYSCONFDIR)/launchd \
 		$$DESTDIR$(SYSCONFDIR)/launchd/agents \
 		$$DESTDIR$(SYSCONFDIR)/launchd/daemons
@@ -70,13 +72,15 @@ install:
 		$$DESTDIR$(DATADIR)/launchd/agents \
 		$$DESTDIR$(DATADIR)/launchd/daemons
 
+	mkdir -p $$DESTDIR$(MANDIR)/man5
 	cat vendor/NextBSD/man/launchd.plist.5 | gzip > $$DESTDIR$(MANDIR)/man5/launchd.plist.5.gz
 	for manpage in vendor/NextBSD/man/*.[0-9] ; do \
 		section=`echo $$manpage | sed 's/.*\.//'` ; \
+		mkdir -p $$DESTDIR$(MANDIR)/man$$section ; \
 		cat $$manpage | gzip > $$DESTDIR$(MANDIR)/man$$section/`basename $$manpage`.gz ; \
 	done
  	
-	test `uname` = "FreeBSD" && install -m 755 rc.FreeBSD $$DESTDIR/usr/local/etc/rc.d/launchd || true
+	test `uname` = "FreeBSD" && install -m 755 rc.FreeBSD $$DESTDIR$(PREFIX)/etc/rc.d/launchd || true
 
 release:
 	test -n "$$VERSION"

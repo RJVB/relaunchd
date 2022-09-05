@@ -16,11 +16,16 @@
 
 #include "vendor/FreeBSD/sys/queue.h"
 
+#include <stdio.h>
 #include <dirent.h>
 #include <fcntl.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#ifdef __linux__
+#include <kqueue/sys/event.h>
+#else
 #include <sys/event.h>
+#endif
 
 #include "log.h"
 #include "job.h"
