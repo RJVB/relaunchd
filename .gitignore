@@ -6,3 +6,7 @@ config.h
 /test/jmtest.log
 *.tar.gz
 *.so
+*.err
+*.out
+*.swp
+*.kdev4

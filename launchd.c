@@ -14,6 +14,14 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#ifndef _BSD_SOURCE
+#define _BSD_SOURCE
+#endif
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
+#include <stdio.h>
 #include <dirent.h>
 #include <fcntl.h>
 #include <inttypes.h>
@@ -69,7 +77,7 @@ static void setup_job_dirs()
 	free(buf);
 
 	if (getuid() != 0 && getenv("HOME")) {
-		if (asprintf(&buf, "/bin/mkdir -p %s/.launchd/agents", getenv("HOME")) < 0) abort();
+		if (asprintf(&buf, "/bin/mkdir -p %s/.local/share/launchd/agents", getenv("HOME")) < 0) abort();
 		if (system(buf) < 0) abort();
 		free(buf);
 	}
@@ -135,7 +143,10 @@ retry:
 		if (errno == EEXIST) {
 			if (pidfile_is_stale(path)) {
 				log_warning("detected a stale pidfile");
-				if (unlink(path) < 0) abort();
+				if (unlink(path) < 0) {
+					log_errno("removing pidfile %s", path);
+					abort();
+				}
 				goto retry;
 			}
 			log_error("another instance of launchd is running");
@@ -161,7 +172,7 @@ static void reap_child() {
 	if (pid < 0) {
 		if (errno == ECHILD) return;
 		log_errno("waitpid");
-		abort();
+// 		abort();
 	}
 
 	job = manager_get_job_by_pid(pid);
@@ -197,29 +208,76 @@ static void reap_child() {
 
 static void load_jobs(const char *path)
 {
+	DIR	*dirp;
+	struct dirent entry, *result;
 	char *buf;
-	if (asprintf(&buf, "/usr/bin/find %s -type f -exec cp {} %s \\;", path, options.watchdir) < 0) abort();
-	log_debug("loading: %s", buf);
-	if (system(buf) < 0) {
-		log_errno("system");
-		abort();
+
+	if ((dirp = opendir(path))) {
+
+	    while (dirp) {
+		    if (readdir_r(dirp, &entry, &result) >= 0) {;
+			    if (!result) break;
+			    if (strcmp(entry.d_name, ".") == 0 || strcmp(entry.d_name, "..") == 0) {
+					continue;
+			    }
+			    if (entry.d_type == DT_REG) {
+					extern char *get_file_extension(char*);
+					bool ok = true;
+				    char *ext = get_file_extension(entry.d_name);
+				    if (strcmp(ext, ".json") == 0) {
+						buf = NULL;
+						if (asprintf(&buf, "%s/%s", path, entry.d_name) > 0) {
+							ok = job_ok_and_enabled(buf);
+							free(buf);
+						} else {
+							log_warning("couldn't check %s/%s: %s", path, entry.d_name, strerror(errno));
+							ok = false;
+						}
+					}
+					if (ok) {
+						buf = NULL;
+						if (asprintf(&buf, "cp -p %s/%s %s", path, entry.d_name, options.watchdir) > 0) {
+							log_debug("%s", buf);
+							if (system(buf) < 0) {
+								log_warning("\"%s\" failed: %s", buf, strerror(errno));
+							}
+							free(buf);
+						}
+					}
+				}
+			}
+	    }
+	    closedir(dirp);
+	} else {
+		log_warning("Failed to open %s: %s", path, strerror(errno) );
 	}
-	free(buf);
+
+// 	if (asprintf(&buf, "/usr/bin/find %s -type f -exec cp {} %s \\;", path, options.watchdir) < 0) abort();
+// 	log_debug("loading: %s", buf);
+// 	if (system(buf) < 0) {
+// 		log_errno("system");
+// 		abort();
+// 	}
+// 	free(buf);
 }
 
 static void load_all_jobs()
 {
 	char *buf, *cur;
 	int i;
-	if (getuid() == 0) {
-		load_jobs("/usr/share/launchd/daemons");
-		load_jobs("/etc/launchd/daemons");
-	} else {
-		load_jobs("/usr/share/launchd/agents");
-		load_jobs("/etc/launchd/agents");
-		if (getenv("HOME") && asprintf(&buf, "%s/.launchd/agents", getenv("HOME")) < 0) abort();
-		load_jobs(buf);
-		free(buf);
+	load_jobs(PREFIX "/share/launchd/daemons");
+	load_jobs(PREFIX "/etc/launchd/daemons");
+	if (getuid() != 0) {
+		struct stat check;
+		extern int stat(const char*, struct stat *);
+		if (getenv("HOME") && asprintf(&buf, "%s/.launchd/agents", getenv("HOME")) > 0 && stat(buf, &check) == 0) {
+			load_jobs(buf);
+			free(buf);
+		}
+		if (getenv("HOME") && asprintf(&buf, "%s/.local/share/launchd/agents", getenv("HOME")) > 0) {
+			load_jobs(buf);
+			free(buf);
+		}
 	}
 }
 
@@ -240,12 +298,21 @@ static void main_loop()
 		if (kev.udata == &setup_signal_handlers) {
 			switch (kev.ident) {
 			case SIGHUP:
+#ifdef DEBUG
+				log_debug("SIGHUP: starting %s", "manager_update_jobs()");
+#endif
 				manager_update_jobs();
 				break;
 			case SIGUSR1:
+#ifdef DEBUG
+				log_debug("SIGUSR1: starting %s", "manager_write_status_file()");
+#endif
 				manager_write_status_file();
 				break;
 			case SIGCHLD:
+#ifdef DEBUG
+				log_debug("SIGCHLD: starting %s", "reap_child()");
+#endif
 				reap_child();
 				break;
 			case SIGINT:
@@ -258,8 +325,16 @@ static void main_loop()
 				log_error("caught unexpected signal");
 			}
 		} else if (kev.udata == &setup_socket_activation) {
-			if (socket_activation_handler() < 0) abort();
+#ifdef DEBUG
+			log_debug("socket activation: starting %s", "socket_activation_handler()");
+#endif
+			if (socket_activation_handler() < 0) {
+				abort();
+			}
 		} else if (kev.udata == &setup_timers) {
+#ifdef DEBUG
+			log_debug("timer setup: starting %s", "timer_handler()");
+#endif
 			if (timer_handler() < 0) abort();
 		} else {
 			log_warning("spurious wakeup, no known handlers");
@@ -274,7 +349,7 @@ static inline void setup_logging()
        if (getuid() == 0) {
                path = strdup("/var/db/launchd/launchd.log");
        } else {
-               asprintf(&path, "%s/.launchd/launchd.log", getenv("HOME"));
+               asprintf(&path, "%s/.local/share/launchd/launchd.log", getenv("HOME"));
        }
        if (log_open(path) < 0) abort();
        free(path);
@@ -290,7 +365,7 @@ main(int argc, char *argv[])
 	if (getuid() == 0) {
 		if (asprintf(&options.pkgstatedir, "/var/db/launchd/run") < 0) abort();
 	} else {
-		if (asprintf(&options.pkgstatedir, "%s/.launchd/run", getenv("HOME")) < 0) abort();
+		if (asprintf(&options.pkgstatedir, "%s/.local/share/launchd/run", getenv("HOME")) < 0) abort();
 	}
 
 	setup_job_dirs();

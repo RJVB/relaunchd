@@ -96,7 +96,7 @@ static inline cvec_t setup_environment_variables(const job_t job, const struct p
 	/* Convert the flat array into an array of key=value pairs */
 	/* Follow the crontab(5) convention of overriding LOGNAME and USER
 	 * and providing a default value for HOME, PATH, and SHELL */
-	log_debug("job %s has %zu env vars\n", job->jm->label, cvec_length(job->jm->environment_variables));
+	log_debug("job %s has %zu env var(s)\n", job->jm->label, cvec_length(job->jm->environment_variables) / 2);
 	for (i = 0; i < cvec_length(job->jm->environment_variables); i += 2) {
 		curp = cvec_get(job->jm->environment_variables, i);
 		log_debug("evaluating %s", curp);
@@ -139,7 +139,11 @@ static inline cvec_t setup_environment_variables(const job_t job, const struct p
 		free(buf);
 	}
 	if (!found[3]) {
+#ifdef PREFIX
+		if (cvec_push(env, "PATH=/usr/bin:/bin:" PREFIX "/bin:/usr/local/bin") < 0) goto err_out;
+#else
 		if (cvec_push(env, "PATH=/usr/bin:/bin:/usr/local/bin") < 0) goto err_out;
+#endif
 	}
 	if (!found[4]) {
 		if (asprintf(&buf, "SHELL=%s", pwent->pw_shell) < 0) goto err_out;
@@ -187,7 +191,6 @@ static inline int exec_job(const job_t job, const struct passwd *pwent) {
 		return (-1);
 	}
 	envp = cvec_to_array(final_env);
-	cvec_free(final_env);
 
 	argv = cvec_to_array(job->jm->program_arguments);
 	path = argv[0];
@@ -218,6 +221,7 @@ static inline int exec_job(const job_t job, const struct passwd *pwent) {
     	return (-1);
     }
     log_notice("executed job");
+	cvec_free(final_env);
     return (0);
 }
 

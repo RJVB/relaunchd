@@ -21,7 +21,7 @@ sa-wrapper.so: wrapper.c
 	$(CC) -shared -fPIC $(CFLAGS) $(DEBUGFLAGS) $(LDFLAGS) -o $@ wrapper.c
 
 test-wrapper: test-wrapper.c sa-wrapper.so
-	$(CC) $(CFLAGS) -Wl,-rpath,. $(DEBUGFLAGS) $(LDFLAGS) -o $@ test-wrapper.c sa-wrapper.so
+	$(CC) $(CFLAGS) -Wl,-rpath,. $(DEBUGFLAGS) $(LDFLAGS) -o $@ test-wrapper.c 
 
 check: sa-wrapper.so test-wrapper
 	./test-wrapper.sh

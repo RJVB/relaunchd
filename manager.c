@@ -65,14 +65,18 @@ char * get_file_extension(const char *filename)
         return result;
 }
 
-static job_manifest_t read_job(const char *filename)
+static job_manifest_t read_job(const char *filename, bool absolute)
 {
 	char *path = NULL, *rename_to = NULL;
 	job_manifest_t jm;
 
 	if ((jm = job_manifest_new()) == NULL) goto err_out;
 
-	if (asprintf(&path, "%s/%s", options.watchdir, filename) < 0) goto err_out;
+	if (absolute) {
+		if (!(path =strdup(filename))) goto err_out;
+	} else {
+		if (asprintf(&path, "%s/%s", options.watchdir, filename) < 0) goto err_out;
+	}
 
 	log_debug("loading %s", path);
 	if (job_manifest_read(jm, path) < 0) goto err_out;
@@ -86,12 +90,22 @@ static job_manifest_t read_job(const char *filename)
 	return (jm);
 
 err_out:
-	if (path) {
+	if (!absolute && path) {
 		(void) unlink(path);
 	}
 	job_manifest_free(jm);
 	free(path);
 	return (NULL);
+}
+
+bool job_ok_and_enabled(const char *path)
+{
+	job_manifest_t jm = read_job(path, true);
+	bool ret = jm && !jm->disabled;
+	if (jm) {
+		free(jm);
+	}
+	return ret;
 }
 
 static ssize_t poll_watchdir()
@@ -112,7 +126,7 @@ static ssize_t poll_watchdir()
 		}
 		ext = get_file_extension(entry.d_name);
 		if (strcmp(ext, ".json") == 0) {
-			jm = read_job(entry.d_name);
+			jm = read_job(entry.d_name, false);
 			if (jm) {
 				LIST_INSERT_HEAD(&pending, jm, jm_le);
 				found_jobs++;
@@ -186,8 +200,11 @@ void update_jobs(void)
 
 int manager_wake_job(job_t job)
 {
-	if (job->state != JOB_STATE_WAITING) {
-		log_error("tried to wake job %s that was not asleep (state=%d)",
+	if (job->state == JOB_STATE_RUNNING) {
+		log_warning("job %s is already running", job->jm->label);
+		return 0;
+	} else if (job->state != JOB_STATE_WAITING && !job_is_runnable(job)) {
+		log_error("tried to wake job %s that was not asleep (state=%d) and is not runnable either",
 				job->jm->label, job->state);
 		return -1;
 	}

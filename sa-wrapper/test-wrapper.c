@@ -22,6 +22,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#ifdef __linux__
+#include <dlfcn.h>
+#endif
 
 int main()
 {

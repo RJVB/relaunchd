@@ -41,8 +41,7 @@ static void wrapper_init()
 	char *buf, *errp;
 	void *handle;
 
-	/* FIXME: hardcoded to FreeBSD 10 */
-	handle = dlopen("libc.so.7", RTLD_LAZY);
+	handle = dlopen("libc.so.6", RTLD_LAZY);
 	if (!handle) err(1, "dlopen failed");
 	*(void **)(&libc_bind_ptr) = dlsym(handle, "bind");
 	if (!libc_bind_ptr) err(1, "dlsym failed: %s", dlerror());

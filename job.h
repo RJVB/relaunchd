@@ -23,6 +23,7 @@
 #include "vendor/FreeBSD/sys/queue.h"
 #include <unistd.h>
 
+#include "config.h"
 #include "manifest.h"
 
 struct job {

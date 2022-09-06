@@ -27,7 +27,7 @@ f.puts <<"__MANIFEST__"
   "Program": "#{pwd}/test-wrapper",
   "EnvironmentVariables": {"LD_PRELOAD":"sa-wrapper.so"},
   "EnableGlobbing": true,
-  "WorkingDirectory": "/",
+  "WorkingDirectory": "#{pwd}",
   "RootDirectory": "/",
   "StandardInPath": "/dev/null",
   "StandardOutPath": "#{pwd}/test-wrapper.out",
@@ -37,12 +37,13 @@ f.puts <<"__MANIFEST__"
       "SockServiceName": "8088",
     },
   },
+  "Disabled": true,
   "Label": "test.sa-wrapper",
 }
 __MANIFEST__
 
 f.close
-system "../launchctl load #{plist}" or raise "launchctl failed"
+system "../launchctl load -w #{plist}" or raise "launchctl failed"
 sleep 2
 puts "plist:\n"
 system "cat #{plist}"

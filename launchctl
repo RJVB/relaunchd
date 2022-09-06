@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 #
 # Copyright (c) 2015 Mark Heily <mark@heily.com>
 #
@@ -18,20 +18,49 @@
 if [ `whoami` = 'root' ] ; then
 	pkgdatadir="/var/db/launchd/run"
 else
-	pkgdatadir="$HOME/.launchd/run"
+	pkgdatadir="$HOME/.local/share/launchd/run"
 fi
 watchdir="$pkgdatadir/new"
 
 command=$1
 shift
 
+enabled () {
+	if [ $1 == 1 ] ;then
+# 		echo "Override any disable flags" 1>&2
+		return 0
+	else
+		tr -d "[:space:]" < ${2} | fgrep -iq '"Disabled":true'
+		if [ $? == 0 ] ;then
+			echo "${2} has Disabled set (use 'load -w' to ignore)" 1>&2
+			return 1
+		else
+# 			echo "${2} is enabled" 1>&2
+			return 0
+		fi
+	fi
+}
+
 case $command in
 load)
+	force=0
+	if [ "${1}" = "-w" -o "${1}" = "-F" ] ;then
+		force=1
+		shift
+	fi
 	for path in $* ; do
 		if [ -d $path ] ; then
-			cp -R $path/*.json $watchdir
+			for j in $path/*.json ;do
+				if enabled ${force} ${j} ; then
+					cp -p ${j} $watchdir
+				fi
+			done
 		else
-			cp $path $watchdir
+			set -x
+			if enabled ${force} ${path} ;then
+				cp -p $path $watchdir
+			fi
+			set +x
 		fi
 	done
 	kill -HUP `cat $pkgdatadir/launchd.pid`

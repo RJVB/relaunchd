@@ -40,18 +40,17 @@ static inline cvec_t cvec_new()
 	return cv;
 }
 
-static inline int cvec_resize(cvec_t cv, const size_t new_size)
+static inline int cvec_resize(cvec_t cv, size_t new_size)
 {
 	char **new_items;
 
-	if (cv->allocated == cv->length) {
-		new_items = realloc(cv->items, cv->allocated + 50);
-		if (new_items == NULL) {
-			return (-1);
-		} else {
-			cv->items = new_items;
-			cv->allocated += 50;
-		}
+	new_size *= sizeof(*cv->items);
+	new_items = cv->allocated ? realloc(cv->items, new_size) : calloc(new_size, 1);
+	if (new_items == NULL) {
+		return (-1);
+	} else {
+		cv->items = new_items;
+		cv->allocated += 50;
 	}
 
 	return (0);

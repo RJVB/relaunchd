@@ -49,4 +49,6 @@ void manager_init();
 void manager_update_jobs();
 int manager_write_status_file();
 
+bool job_ok_and_enabled(const char *path);
+
 #endif /* MANAGER_H_ */

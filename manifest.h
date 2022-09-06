@@ -32,7 +32,7 @@ struct job_manifest {
 	size_t	 json_size;
 
 	char 	*label;
-	//not implemented: Disabled key
+	bool 	disabled;
 	char 	*user_name;
 	char 	*group_name;
 
@@ -61,6 +61,7 @@ struct job_manifest {
 			*stdout_path,
 			*stderr_path;
 	bool	abandon_process_group;
+	bool 	keep_alive;
 	// TODO: ResourceLimits, HopefullyExits*, KeepAlive, inetd, cron, LowPriorityIO, LaunchOnlyOnce
 	SLIST_HEAD(,job_manifest_socket) sockets;
 	int32_t refcount;

@@ -135,6 +135,11 @@ static int parse_not_implemented(parser_state_t p) {
 	return -1;
 }
 
+static int parse_not_implemented_warning(parser_state_t p) {
+	log_warning("feature %s not implemented", p->key);
+	return 1;
+}
+
 static int parse_label(parser_state_t p) {
 	if (parse_string(&p->jm->label, p) < 1) return -1;
 	//TODO: validation
@@ -183,6 +188,20 @@ static int parse_EnableGlobbing(parser_state_t p) {
 
 static int parse_RunAtLoad(parser_state_t p) {
 	return parse_bool(&p->jm->run_at_load, p);
+}
+
+static int parse_Disabled(parser_state_t p) {
+	return parse_bool(&p->jm->disabled, p);
+}
+
+static int parse_KeepAlive(parser_state_t p) {
+	return parse_bool(&p->jm->keep_alive, p);
+}
+
+static int parse_ThrottleInterval(parser_state_t p) {
+	if (parse_uint32(&p->jm->throttle_interval, p) < 1) return -1;
+	//TODO: validation
+	return (1);
 }
 
 // XXX seems very illogical, perhaps the test.json file is malformed?
@@ -413,25 +432,27 @@ err_out:
   	return (-1);
 }
 
+#ifdef __FreeBSD__
 static int parse_JailName(parser_state_t p) {
 	if (parse_string(&p->jm->jail_name, p) < 1) return -1;
 	//TODO: validation
 	return (1);
 }
+#endif
 
 static const struct {
         const char *ident;
         int (*func)(parser_state_t);
 } manifest_parser[] = {
 	{ "Label", parse_label },
-	{ "Disabled", parse_not_implemented },
+	{ "Disabled", parse_Disabled },
 	{ "UserName", parse_UserName },
 	{ "GroupName", parse_GroupName },
 	{ "inetdCompatibility", parse_not_implemented },
 	{ "Program", parse_program },
 	{ "ProgramArguments", parse_ProgramArguments },
 	{ "EnableGlobbing", parse_EnableGlobbing },
-	{ "KeepAlive", parse_not_implemented },
+	{ "KeepAlive", parse_KeepAlive },
 	{ "RunAtLoad", parse_RunAtLoad },
 	{ "WorkingDirectory", parse_WorkingDirectory },
 	{ "RootDirectory", parse_RootDirectory },
@@ -439,7 +460,7 @@ static const struct {
 	{ "Umask", parse_not_implemented },
 	{ "TimeOut", parse_not_implemented },
 	{ "ExitTimeOut", parse_not_implemented },
-	{ "ThrottleInterval", parse_not_implemented },
+	{ "ThrottleInterval", parse_ThrottleInterval },
 	{ "InitGroups", parse_InitGroups },
 	{ "WatchPaths", parse_WatchPaths },
 	{ "QueueDirectories", parse_QueueDirectories },
@@ -462,7 +483,11 @@ static const struct {
 	{ "Sockets", parse_Sockets },
 
 	/* XXX-experimental */
+#ifdef __FreeBSD__
 	{ "JailName", parse_JailName },
+#else
+	{ "JailName", parse_not_implemented_warning },
+#endif
 
 	{ NULL, NULL },
 };
@@ -541,6 +566,7 @@ job_manifest_t job_manifest_new()
 
 	jm = calloc(1, sizeof(*jm));
 	if (jm == NULL) return (NULL);
+	jm->disabled = false;
 	jm->exit_timeout = 20;
 	jm->throttle_interval = 10;
 	jm->init_groups = true;

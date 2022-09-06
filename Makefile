@@ -40,10 +40,11 @@ launchd-debug:
 config.h: Makefile Makefile.inc
 	echo "/* Automatically generated -- do not edit */" > config.h
 .if exists(/usr/include/sys/limits.h)
-		printf '#define HAVE_SYS_LIMITS_H 1' >> config.h
+		printf '#define HAVE_SYS_LIMITS_H 1\n' >> config.h
 .else
-		printf '#define HAVE_SYS_LIMITS_H 0' >> config.h
+		printf '#define HAVE_SYS_LIMITS_H 0\n' >> config.h
 .endif
+	printf '#define PREFIX "$(PREFIX)"' >> config.h
  
 clean:
 	rm -f *.o config.h
